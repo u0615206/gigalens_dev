@@ -30,11 +30,13 @@ class ForwardProbModel(gigalens.model.ProbabilisticModel):
             self,
             prior: tfd.Distribution,
             observed_image=None,
+            likelihood_weight=None,
             background_rms=None,
             exp_time=None,
     ):
         super(ForwardProbModel, self).__init__(prior)
         self.observed_image = tf.constant(observed_image, dtype=tf.float32)
+        self.likelihood_weight = tf.constant(likelihood_weight, dtype=tf.int32)
         self.background_rms = tf.constant(background_rms, dtype=tf.float32)
         self.exp_time = tf.constant(float(exp_time), dtype=tf.float32)
         example = prior.sample(seed=0)
@@ -75,6 +77,9 @@ class ForwardProbModel(gigalens.model.ProbabilisticModel):
         x = self.bij.forward(z)
         im_sim = simulator.simulate(x)
         err_map = tf.math.sqrt(self.background_rms ** 2 + tf.clip_by_value(im_sim, 0, np.inf) / self.exp_time)
+        mask = self.likelihood_weight
+        mask[np.where(mask == 0)] = 1e10
+        err_map = err_map * mask
         log_like = tfd.Independent(
             tfd.Normal(im_sim, err_map), reinterpreted_batch_ndims=2
         ).log_prob(self.observed_image)
@@ -82,7 +87,7 @@ class ForwardProbModel(gigalens.model.ProbabilisticModel):
             x
         ) + self.unconstraining_bij.forward_log_det_jacobian(self.pack_bij.forward(z))
         return log_like + log_prior, tf.reduce_mean(
-            ((im_sim - self.observed_image) / err_map) ** 2, axis=(-2, -1)
+            ((im_sim - self.observed_image) / err_map) ** 2 * self.likelihood_weight, axis=(-2, -1)
         )
 
 
