@@ -26,7 +26,10 @@ class Sersic(gigalens.profile.LightProfile):
     def light(self, x, y, R_sersic, n_sersic, center_x, center_y, Ie=None):
         Ie = tf.ones_like(R_sersic) if self.use_lstsq else Ie
         R = self.distance(x, y, center_x, center_y)
-        bn = 1.9992 * n_sersic - 0.3271
+        if n_sersic >= 0.36: # from Ciotti & Bertin 1999, truncated to n^-3
+            bn=2.0*n_sersic-1./3+4./(405.*n_sersic)+46./(25515.*n_sersic**2.)+131./(1148175.*n_sersic**3.)
+        else: # from MacArthur et al. 2003
+            bn=0.01945-0.8902*n_sersic+10.95*n_sersic**2.-19.67*n_sersic**3.+13.43*n_sersic**4.
         ret = Ie * tf.math.exp(-bn * ((R / R_sersic) ** (1 / n_sersic) - 1.0))
         return ret[tf.newaxis, ...] if self.use_lstsq else ret
 
@@ -67,7 +70,10 @@ class SersicEllipse(Sersic):
     def light(self, x, y, R_sersic, n_sersic, e1, e2, center_x, center_y, Ie=None):
         Ie = tf.ones_like(R_sersic) if self.use_lstsq else Ie
         R = self.distance(x, y, center_x, center_y, e1, e2)
-        bn = 1.9992 * n_sersic - 0.3271
+        if n_sersic >= 0.36: # from Ciotti & Bertin 1999, truncated to n^-3
+            bn=2.0*n_sersic-1./3+4./(405.*n_sersic)+46./(25515.*n_sersic**2.)+131./(1148175.*n_sersic**3.)
+        else: # from MacArthur et al. 2003
+            bn=0.01945-0.8902*n_sersic+10.95*n_sersic**2.-19.67*n_sersic**3.+13.43*n_sersic**4.
         ret = Ie * tf.math.exp(-bn * ((R / R_sersic) ** (1 / n_sersic) - 1.0))
         return ret[tf.newaxis, ...] if self.use_lstsq else ret
 
@@ -104,7 +110,10 @@ class CoreSersic(Sersic):
     ):
         Ie = tf.ones_like(R_sersic) if self.use_lstsq else Ie
         R = self.distance(x, y, center_x, center_y, e1, e2)
-        bn = 1.9992 * n_sersic - 0.3271
+        if n_sersic >= 0.36: # from Ciotti & Bertin 1999, truncated to n^-3
+            bn=2.0*n_sersic-1./3+4./(405.*n_sersic)+46./(25515.*n_sersic**2.)+131./(1148175.*n_sersic**3.)
+        else: # from MacArthur et al. 2003
+            bn=0.01945-0.8902*n_sersic+10.95*n_sersic**2.-19.67*n_sersic**3.+13.43*n_sersic**4.
         ret = (
                 Ie
                 * (1 + (Rb / R) ** alpha) ** (gamma / alpha)
