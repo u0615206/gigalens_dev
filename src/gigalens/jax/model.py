@@ -15,11 +15,15 @@ class ForwardProbModel(gigalens.model.ProbabilisticModel):
             self,
             prior: tfd.Distribution,
             observed_image=None,
+            likelihood_weight=None,
             background_rms=None,
             exp_time=None,
     ):
         super(ForwardProbModel, self).__init__(prior)
         self.observed_image = jnp.array(observed_image)
+        if likelihood_weight is None:
+            likelihood_weight=jnp.ones_like(observed_image)
+        self.likelihood_weight=likelihood_weight
         self.background_rms = jnp.float32(background_rms)
         self.exp_time = jnp.float32(exp_time)
         example = prior.sample(seed=random.PRNGKey(0))
@@ -36,7 +40,7 @@ class ForwardProbModel(gigalens.model.ProbabilisticModel):
         z = list(z.T)
         x = self.bij.forward(z)
         im_sim = simulator.simulate(x)
-        err_map = jnp.sqrt(self.background_rms ** 2 + im_sim / self.exp_time)
+        err_map = jnp.sqrt(self.background_rms ** 2 + im_sim / self.exp_time)*self.likelihood_weight
         log_like = tfd.Independent(
             tfd.Normal(im_sim, err_map), reinterpreted_batch_ndims=2
         ).log_prob(self.observed_image)
@@ -53,11 +57,14 @@ class BackwardProbModel(gigalens.model.ProbabilisticModel):
         super(BackwardProbModel, self).__init__(prior)
         err_map = jnp.sqrt(
             background_rms ** 2 + jnp.clip(observed_image, 0, np.inf) / exp_time
-        )
+        )*self.likelihood_weight
         self.observed_dist = tfd.Independent(
             tfd.Normal(observed_image, err_map), reinterpreted_batch_ndims=2
         )
         self.observed_image = jnp.array(observed_image)
+        if likelihood_weight is None:
+            likelihood_weight=jnp.ones_like(observed_image)
+        self.likelihood_weight=likelihood_weight
         self.err_map = jnp.array(err_map)
         example = prior.sample(seed=random.PRNGKey(0))
         self.pack_bij = tfb.pack_sequence_as(example)
